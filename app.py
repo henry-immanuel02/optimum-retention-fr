@@ -108,14 +108,17 @@ else:
         adj_net_lr = row["ADJ NET LR"].values[0]
         suggested_share = row["Suggested Share"].values[0]
         buffer_15 = row["Buffer 15%"].values[0]
-        if suggested_share <= 0:
+        if suggested_share <= 0 and buffer15 <= 0:
             adj_net_lr = "-"
 
         # Dashboard metrics
         col1, col2, col3 = st.columns(3)
         col1.metric("Share to Retain", f"{suggested_share*100:.2f}%")
         col2.metric("Buffer 15%", f"{buffer_15*100:.2f}%")
-        col3.metric("Net Loss Ratio", f"{adj_net_lr*100:.2f}%")
+        try:
+            col3.metric("Net Loss Ratio", f"{adj_net_lr*100:.2f}%")
+        except:
+            col3.metric("Net Loss Ratio", f"-")
 
         # Exposure calculation berdasarkan TSI → PML
         pml = tsi_pml_map.get(tsi_selected, None)

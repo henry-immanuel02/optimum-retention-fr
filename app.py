@@ -17,6 +17,31 @@ users = {
 }
 
 # ================================
+# Mapping TSI RANGE → PML
+# ================================
+tsi_pml_map = {
+    "01. [0, 500 Mio]": 5e8,
+    "02. (500 Mio, 1 Bio]": 1e9,
+    "03. (1 Bio, 5 Bio]": 5e9,
+    "04. (5 Bio, 10 Bio]": 1e10,
+    "05. (10 Bio, 25 Bio]": 2.5e10,
+    "06. (25 Bio, 50 Bio]": 5e10,
+    "07. (50 Bio, 75 Bio]": 7.5e10,
+    "08. (75 Bio, 100 Bio]": 1e11,
+    "09. (100 Bio, 250 Bio]": 2.5e11,
+    "10. (250 Bio, 500 Bio]": 5e11,
+    "11. (500 Bio, 750 Bio]": 7.5e11,
+    "12. (750 Bio, 1 T]": 1e12,
+    "13. (1T, 2T]": 2e12,
+    "14. (2T, 3T]": 3e12,
+    "15. > 3T": 5e12
+}
+
+# Helper format ke "Bio"
+def format_bio(x):
+    return f"{x/1e9:,.2f} Bio"
+
+# ================================
 # Header
 # ================================
 st.title("MNC Insurance Actuarial Dashboard")
@@ -87,6 +112,17 @@ else:
         col1.metric("Share to Retain", f"{suggested_share*100:.2f}%")
         col2.metric("Buffer 15%", f"{buffer_15*100:.2f}%")
         col3.metric("Net Loss Ratio", f"{adj_net_lr*100:.2f}%")
+
+        # Exposure calculation berdasarkan TSI → PML
+        pml = tsi_pml_map.get(tsi_selected, None)
+        if pml is not None:
+            retained_amount = suggested_share * pml
+            buffer_amount = buffer_15 * pml
+
+            st.write("### Retained Exposure")
+            col_a, col_b = st.columns(2)
+            col_a.metric("Retained (Share × PML)", format_bio(retained_amount))
+            col_b.metric("Buffer (15% × PML)", format_bio(buffer_amount))
 
         # Extra inputs
         if suggested_share > 0:

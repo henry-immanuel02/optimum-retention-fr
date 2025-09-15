@@ -1,24 +1,27 @@
 import streamlit as st
-import hashlib
 import pandas as pd
-import plotly.graph_objects as go
+import numpy as np
+import plotly.express as px
 
-# ================================
-# Load dataset (pastikan file ada di folder yang sama dengan app.py)
-# ================================
-df = pd.read_parquet("Completed Net Loss Ratio by Risk Code dan TSI Range2.parquet")
+# ---------------------------
+# Load data
+# ---------------------------
+@st.cache_data
+def load_data():
+    return pd.read_parquet("Completed Net Loss Ratio by Risk Code dan TSI Range2.parquet")
 
-# ================================
-# User credentials (hash pakai blake2b.hexdigest())
-# ================================
-users = {
-    "568622d8836e4856d75132f68bc2cdb16ee788ad6b72f74bc264f9757d8a54ded1c02cf2bb37b59420bc9f43dcd297b9a828d5f673d9a977b68b724650b1442a":
-    "db1bc89118ae73eea00e2de5868a96cd25a80c3eb6cd62639a921ba5abfc1b6bee91783fc1a1167dc3e14966c56a23237eb635dfb4529f3ddbe533c9b8d609f4"
-}
+df = load_data()
 
-# ================================
-# Mapping TSI RANGE → PML
-# ================================
+# ---------------------------
+# Helper
+# ---------------------------
+def format_percent(x):
+    return f"{x*100:.2f}%"
+
+def format_bio(x):
+    return f"{x/1e9:,.2f} Bio"
+
+# Mapping TSI RANGE ke PML
 tsi_pml_map = {
     "01. [0, 500 Mio]": 5e8,
     "02. (500 Mio, 1 Bio]": 1e9,
@@ -37,150 +40,55 @@ tsi_pml_map = {
     "15. > 3T": 5e12
 }
 
-# Helper format ke "Bio"
-def format_bio(x):
-    return f"{x/1e9:,.2f} Bio"
+def get_pml(tsi_selected):
+    # cari key yang terkandung di string
+    for key in tsi_pml_map:
+        if key in tsi_selected:
+            return tsi_pml_map[key]
+    return None
 
-# ================================
-# Header
-# ================================
-st.title("MNC Insurance Actuarial Dashboard")
-st.markdown(
-    """
-    <p style='color:gray; font-size:14px;'>
-    Aplikasi ini masih dalam tahap pengembangan. Bug, kritik, dan saran dapat disampaikan ke 
-    <a href="mailto:henry.sihombing@mnc-insurance.com">henry.sihombing@mnc-insurance.com</a>
-    </p>
-    <hr style="border:1px solid #bbb; margin:20px 0;">
-    """,
-    unsafe_allow_html=True
-)
+# ---------------------------
+# Sidebar
+# ---------------------------
+st.sidebar.header("Filter")
+risk_selected = st.sidebar.selectbox("Pilih Risk Code", df["RISK_CODE"].unique())
+tsi_selected = st.sidebar.selectbox("Pilih TSI Range", df["TSI_RANGE"].unique())
 
-# ================================
-# Login system
-# ================================
-if "logged_in" not in st.session_state:
-    st.session_state.logged_in = False
+# Filter dataset
+filtered_df = df[(df["RISK_CODE"] == risk_selected) & (df["TSI_RANGE"] == tsi_selected)]
 
-if not st.session_state.logged_in:
-    username_input = st.text_input("Masukkan Username")
-    password_input = st.text_input("Masukkan Password", type="password")
+# ---------------------------
+# Main
+# ---------------------------
+st.title("📊 Actuarial Dashboard")
 
-    if st.button("Login"):
-        username_hashed = hashlib.blake2b(username_input.encode("utf-8")).hexdigest()
-        password_hashed = hashlib.blake2b(password_input.encode("utf-8")).hexdigest()
+if not filtered_df.empty:
+    net_lr = filtered_df["NET_LR"].values[0]
+    suggested_share = max(0, min(1, 0.75 - net_lr))  # contoh formula
+    buffer_15 = suggested_share * 1.15
 
-        if username_hashed in users and users[username_hashed] == password_hashed:
-            st.session_state.logged_in = True
-            st.success("Login berhasil!")
-            st.rerun()
-        else:
-            st.error("❌ Username atau password salah")
+    # Metrics utama
+    col1, col2 = st.columns(2)
+    col1.metric("Share to Retain", format_percent(suggested_share))
+    col2.metric("Buffer 15%", format_percent(buffer_15))
 
-# ================================
-# Main App (setelah login)
-# ================================
+    # Ambil PML
+    pml = get_pml(tsi_selected)
+    if pml is not None:
+        retained_amount = suggested_share * pml
+        buffer_amount = buffer_15 * pml
+
+        st.write("### Retained Exposure")
+        col_a, col_b = st.columns(2)
+        col_a.metric("Retained (Share × PML)", format_bio(retained_amount))
+        col_b.metric("Buffer (15% × PML)", format_bio(buffer_amount))
+    else:
+        st.warning(f"Tidak ditemukan PML untuk '{tsi_selected}'")
+
+    # Chart distribusi NET_LR (opsional)
+    st.write("### Distribusi Net Loss Ratio")
+    fig = px.histogram(df, x="NET_LR", nbins=30, title="Net Loss Ratio Distribution")
+    st.plotly_chart(fig, use_container_width=True)
+
 else:
-    st.subheader("Optimum Share and CoR Calculator")
-
-    # Dropdown Risk Code
-    risk_selected = st.selectbox(
-        "Pilih RISK CODE",
-        options=df["RISK CODE"].unique()
-    )
-
-    # Dropdown TSI Range
-    tsi_options = df[df["RISK CODE"] == risk_selected]["TSI RANGE"].unique()
-    tsi_selected = st.selectbox(
-        "Pilih TSI RANGE",
-        options=tsi_options
-    )
-
-    # Ambil data row
-    row = df[
-        (df["RISK CODE"] == risk_selected) &
-        (df["TSI RANGE"] == tsi_selected)
-    ]
-
-    if not row.empty:
-        adj_net_lr = row["ADJ NET LR"].values[0]
-        suggested_share = row["Suggested Share"].values[0]
-        buffer_15 = row["Buffer 15%"].values[0]
-
-        # Dashboard metrics
-        col1, col2, col3 = st.columns(3)
-        col1.metric("Share to Retain", f"{suggested_share*100:.2f}%")
-        col2.metric("Buffer 15%", f"{buffer_15*100:.2f}%")
-        col3.metric("Net Loss Ratio", f"{adj_net_lr*100:.2f}%")
-
-        # Exposure calculation berdasarkan TSI → PML
-        pml = tsi_pml_map.get(tsi_selected, None)
-        if pml is not None:
-            retained_amount = suggested_share * pml
-            buffer_amount = buffer_15 * pml
-
-            st.write("### Retained Exposure")
-            col_a, col_b = st.columns(2)
-            col_a.metric("Retained Share:", format_bio(retained_amount))
-            col_b.metric("(With 15% Buffer): ", format_bio(buffer_amount))
-
-        # Extra inputs
-        if suggested_share > 0:
-            komisi_ojk = st.number_input(
-                "Masukkan Komisi OJK (%)",
-                min_value=0.0,
-                max_value=100.0,
-                step=0.1,
-                format="%.2f"
-            )
-            ovr = st.number_input(
-                "Masukkan OVR (%)",
-                min_value=0.0,
-                max_value=100.0,
-                step=0.1,
-                format="%.2f"
-            )
-
-            if st.button("Calculate CoR"):
-                cor = adj_net_lr*100 + komisi_ojk + ovr + 15
-
-                if cor < 100:
-                    st.success(f"📊 CoR = **{cor:.2f}%**")
-                else:
-                    st.markdown(
-                        f"<span style='color:red; font-weight:bold;'>📊 CoR = {cor:.2f}%</span>",
-                        unsafe_allow_html=True
-                    )
-
-                # Waterfall chart
-                st.subheader("Expected UW Result")
-                base = 100
-                values = [-adj_net_lr*100, -komisi_ojk, -ovr, -15]
-                labels = ["Gross Premium", "Net Loss Ratio", "Komisi OJK", "OVR", "OPEX", "Profit/Loss"]
-                measures = ["absolute", "relative", "relative", "relative", "relative", "total"]
-
-                final_val = base + sum(values)
-                total_color = "green" if final_val > 0 else "red"
-
-                fig = go.Figure(go.Waterfall(
-                    name="CoR Breakdown",
-                    orientation="v",
-                    measure=measures,
-                    x=labels,
-                    text=[f"{base:.2f}%"] + [f"{v:.2f}%" for v in values] + [f"{final_val:.2f}%"],
-                    y=[base] + values + [None],
-                    connector={"line": {"color": "rgb(63, 63, 63)"}},
-                    decreasing={"marker": {"color": "red"}},
-                    increasing={"marker": {"color": "blue"}},
-                    totals={"marker": {"color": total_color}}
-                ))
-
-                st.plotly_chart(fig, use_container_width=True)
-
-        else:
-            st.error("⚠️ This risk code is not recommended!")
-
-    # Logout button
-    if st.button("Logout"):
-        st.session_state.logged_in = False
-        st.rerun()
+    st.warning("Data tidak ditemukan untuk filter tersebut.")

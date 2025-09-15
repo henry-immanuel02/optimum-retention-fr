@@ -108,7 +108,7 @@ else:
         adj_net_lr = row["ADJ NET LR"].values[0]
         suggested_share = row["Suggested Share"].values[0]
         buffer_15 = row["Buffer 15%"].values[0]
-        if suggested_share <= 0 and buffer15 <= 0:
+        if suggested_share <= 0 and buffer_15 <= 0:
             adj_net_lr = "-"
 
         # Dashboard metrics

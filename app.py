@@ -121,10 +121,10 @@ else:
             retained_amount = suggested_share * pml
             buffer_amount = buffer_15 * pml
 
-            st.write("### Retained Exposure")
+            st.write("### Retained in Amount")
             col_a, col_b = st.columns(2)
-            col_a.metric("Retained (Share × PML)", format_bio(retained_amount))
-            col_b.metric("Buffer (15% × PML)", format_bio(buffer_amount))
+            col_a.metric("Retained Amount: ", format_bio(retained_amount))
+            col_b.metric("Buffer 15%:", format_bio(buffer_amount))
 
         # Extra inputs
         if suggested_share > 0:

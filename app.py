@@ -121,8 +121,8 @@ else:
 
             st.write("### Retained Exposure")
             col_a, col_b = st.columns(2)
-            col_a.metric("Retained (Share × PML)", format_bio(retained_amount))
-            col_b.metric("Buffer (15% × PML)", format_bio(buffer_amount))
+            col_a.metric("Retained Share:", format_bio(retained_amount))
+            col_b.metric("(With 15% Buffer): ", format_bio(buffer_amount))
 
         # Extra inputs
         if suggested_share > 0:

@@ -6,7 +6,7 @@ import plotly.graph_objects as go
 # ================================
 # Load dataset (pastikan file ada di folder yang sama dengan app.py)
 # ================================
-df = pd.read_parquet("Completed Net Loss Ratio by Risk Code dan TSI Range2.parquet")
+df = pd.read_parquet("Completed Net Loss Ratio by Risk Code dan TSI Range3.parquet")
 
 # ================================
 # User credentials (hash pakai blake2b.hexdigest())
